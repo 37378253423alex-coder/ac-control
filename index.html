@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AC</title>
+
+<style>
+body {
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #000;
+  color: #fff;
+  text-align: center;
+  margin: 0;
+}
+
+h2 {
+  margin-top: 30px;
+  font-weight: 500;
+}
+
+button {
+  width: 85%;
+  padding: 18px;
+  margin: 8px;
+  font-size: 17px;
+  border-radius: 18px;
+  border: none;
+  background: #1c1c1e;
+  color: white;
+  transition: 0.2s;
+}
+
+button:active {
+  transform: scale(0.97);
+}
+
+.active {
+  background: #fff;
+  color: #000;
+}
+
+input[type=range] {
+  width: 85%;
+  margin-top: 15px;
+}
+
+#temp {
+  font-size: 28px;
+  margin: 15px 0;
+}
+
+.status {
+  color: #8e8e93;
+  font-size: 14px;
+}
+</style>
+</head>
+
+<body>
+
+<h2>Кондиционер</h2>
+
+<div class="status" id="status">Выключен</div>
+
+<button id="btn_on" onclick="setMode('COOL')">Включить</button>
+<button id="btn_off" onclick="turnOff()">Выключить</button>
+
+<button id="cool" onclick="setMode('COOL')">Холод</button>
+<button id="heat" onclick="setMode('HEAT')">Обогрев</button>
+
+<div id="temp">24°C</div>
+
+<input type="range" min="16" max="30" value="24"
+oninput="updateTemp(this.value)" onchange="setTemp(this.value)">
+
+<button id="sleep" onclick="setPreset('sleep')">Ночной режим</button>
+
+<script>
+const base = "http://92.115.153.128:18080";
+const username = "admin";
+const password = "72742";
+
+function send(url) {
+  fetch(url, {
+    headers: {
+      'Authorization': 'Basic ' + btoa(username + ":" + password)
+    }
+  });
+}
+
+function clearActive() {
+  document.querySelectorAll("button").forEach(btn => btn.classList.remove("active"));
+}
+
+function turnOff() {
+  send(base + "/climate/my_ac/set?mode=OFF");
+  clearActive();
+  document.getElementById("btn_off").classList.add("active");
+  document.getElementById("status").innerText = "Выключен";
+}
+
+function setMode(mode) {
+  send(base + "/climate/my_ac/set?mode=" + mode);
+
+  clearActive();
+
+  if(mode === "COOL") {
+    document.getElementById("cool").classList.add("active");
+    document.getElementById("btn_on").classList.add("active");
+    document.getElementById("status").innerText = "Охлаждение";
+  }
+
+  if(mode === "HEAT") {
+    document.getElementById("heat").classList.add("active");
+    document.getElementById("btn_on").classList.add("active");
+    document.getElementById("status").innerText = "Обогрев";
+  }
+}
+
+function setTemp(temp) {
+  send(base + "/climate/my_ac/set?temperature=" + temp);
+}
+
+function updateTemp(temp) {
+  document.getElementById("temp").innerText = temp + "°C";
+}
+
+function setPreset(preset) {
+  send(base + "/climate/my_ac/set?preset=" + preset);
+
+  clearActive();
+  document.getElementById("sleep").classList.add("active");
+  document.getElementById("status").innerText = "Ночной режим";
+}
+</script>
+
+</body>
+</html>
