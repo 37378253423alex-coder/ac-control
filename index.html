@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AC</title>
+<title>AC Remote</title>
 
 <style>
 body {
@@ -11,11 +11,13 @@ body {
   color: #fff;
   text-align: center;
   margin: 0;
+  padding-bottom: 30px;
 }
 
 h2 {
   margin-top: 30px;
   font-weight: 500;
+  letter-spacing: -0.5px;
 }
 
 button {
@@ -23,35 +25,41 @@ button {
   padding: 18px;
   margin: 8px;
   font-size: 17px;
+  font-weight: 500;
   border-radius: 18px;
   border: none;
   background: #1c1c1e;
   color: white;
-  transition: 0.2s;
+  transition: background 0.2s, transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
 }
 
 button:active {
   transform: scale(0.97);
+  background: #2c2c2e;
 }
 
 .active {
-  background: #fff;
-  color: #000;
+  background: #fff !important;
+  color: #000 !important;
 }
 
 input[type=range] {
   width: 85%;
-  margin-top: 15px;
+  margin: 25px 0;
+  accent-color: #fff;
 }
 
 #temp {
-  font-size: 28px;
-  margin: 15px 0;
+  font-size: 48px;
+  font-weight: 300;
+  margin: 20px 0 10px 0;
 }
 
 .status {
   color: #8e8e93;
-  font-size: 14px;
+  font-size: 15px;
+  margin-bottom: 20px;
 }
 </style>
 </head>
@@ -59,79 +67,146 @@ input[type=range] {
 <body>
 
 <h2>Кондиционер</h2>
+<div class="status" id="status">Связь...</div>
 
-<div class="status" id="status">Выключен</div>
-
-<button id="btn_on" onclick="setMode('COOL')">Включить</button>
 <button id="btn_off" onclick="turnOff()">Выключить</button>
 
-<button id="cool" onclick="setMode('COOL')">Холод</button>
-<button id="heat" onclick="setMode('HEAT')">Обогрев</button>
+<div style="margin: 15px 0;">
+  <button id="cool" style="width: 40%; display: inline-block; margin: 5px;" onclick="setMode('COOL')">Холод</button>
+  <button id="heat" style="width: 40%; display: inline-block; margin: 5px;" onclick="setMode('HEAT')">Обогрев</button>
+</div>
 
 <div id="temp">24°C</div>
 
 <input type="range" min="16" max="30" value="24"
 oninput="updateTemp(this.value)" onchange="setTemp(this.value)">
 
-<button id="sleep" onclick="setPreset('sleep')">Ночной режим</button>
+<button id="sleep" onclick="toggleSleep()">Ночной режим</button>
 
 <script>
-const base = "http://92.115.153.128:18080";
+// Обновленные настройки подключения по твоим данным
+const base = "http://92.115.153.128:18473"; 
 const username = "admin";
 const password = "72742";
+const acId = "c44dde"; // Твой новый ID модуля
 
-function send(url) {
+// Функция отправки POST запроса для управления
+function sendCommand(param, value) {
+  const url = `${base}/climate/${acId}/set?${param}=${value}`;
+  
   fetch(url, {
+    method: 'POST',
     headers: {
       'Authorization': 'Basic ' + btoa(username + ":" + password)
     }
+  })
+  .then(response => {
+    if (!response.ok) {
+      document.getElementById("status").innerText = "Ошибка команды";
+      document.getElementById("status").style.color = "#ff453a";
+    } else {
+      document.getElementById("status").style.color = "#8e8e93";
+    }
+  })
+  .catch(err => {
+    document.getElementById("status").innerText = "Нет связи с модулем";
+    document.getElementById("status").style.color = "#ff453a";
   });
 }
 
 function clearActive() {
-  document.querySelectorAll("button").forEach(btn => btn.classList.remove("active"));
+  document.getElementById("btn_off").classList.remove("active");
+  document.getElementById("cool").classList.remove("active");
+  document.getElementById("heat").classList.remove("active");
+  document.getElementById("sleep").classList.remove("active");
 }
 
 function turnOff() {
-  send(base + "/climate/my_ac/set?mode=OFF");
+  sendCommand("mode", "OFF");
   clearActive();
   document.getElementById("btn_off").classList.add("active");
   document.getElementById("status").innerText = "Выключен";
 }
 
 function setMode(mode) {
-  send(base + "/climate/my_ac/set?mode=" + mode);
-
+  sendCommand("mode", mode);
   clearActive();
 
   if(mode === "COOL") {
     document.getElementById("cool").classList.add("active");
-    document.getElementById("btn_on").classList.add("active");
     document.getElementById("status").innerText = "Охлаждение";
   }
-
   if(mode === "HEAT") {
     document.getElementById("heat").classList.add("active");
-    document.getElementById("btn_on").classList.add("active");
     document.getElementById("status").innerText = "Обогрев";
   }
 }
 
 function setTemp(temp) {
-  send(base + "/climate/my_ac/set?temperature=" + temp);
+  sendCommand("temperature", temp);
 }
 
 function updateTemp(temp) {
   document.getElementById("temp").innerText = temp + "°C";
 }
 
-function setPreset(preset) {
-  send(base + "/climate/my_ac/set?preset=" + preset);
-
-  clearActive();
-  document.getElementById("sleep").classList.add("active");
-  document.getElementById("status").innerText = "Ночной режим";
+let isSleep = false;
+function toggleSleep() {
+  isSleep = !isSleep;
+  if (isSleep) {
+    sendCommand("preset", "SLEEP");
+    document.getElementById("sleep").classList.add("active");
+    document.getElementById("status").innerText = "Ночной режим";
+  } else {
+    sendCommand("preset", "NONE");
+    document.getElementById("sleep").classList.remove("active");
+    document.getElementById("status").innerText = "Обычный режим";
+  }
 }
+
+// Получение текущего состояния с кондиционера извне
+function getStatus() {
+  fetch(`${base}/climate/${acId}`, {
+    headers: { 'Authorization': 'Basic ' + btoa(username + ":" + password) }
+  })
+  .then(res => res.json())
+  .then(data => {
+    clearActive();
+    document.getElementById("status").style.color = "#8e8e93";
+    
+    // Синхронизируем температуру на ползунке
+    if (data.target_temperature) {
+      document.getElementById("temp").innerText = data.target_temperature + "°C";
+      document.querySelector("input[type=range]").value = data.target_temperature;
+    }
+    
+    // Синхронизируем кнопки режимов
+    if (data.mode === "OFF") {
+      document.getElementById("btn_off").classList.add("active");
+      document.getElementById("status").innerText = "Выключен";
+    } else if (data.mode === "COOL") {
+      document.getElementById("cool").classList.add("active");
+      document.getElementById("status").innerText = "Охлаждение";
+    } else if (data.mode === "HEAT") {
+      document.getElementById("heat").classList.add("active");
+      document.getElementById("status").innerText = "Обогрев";
+    }
+    
+    // Синхронизируем ночной пресет
+    if (data.preset === "SLEEP") {
+      document.getElementById("sleep").classList.add("active");
+      isSleep = true;
+    }
+  })
+  .catch(() => {
+    document.getElementById("status").innerText = "Кондиционер оффлайн";
+    document.getElementById("status").style.color = "#ff453a";
+  });
+}
+
+// Запускаем опрос состояния сразу и каждые 5 секунд
+getStatus();
+setInterval(getStatus, 5000);
 </script>
 
 </body>
